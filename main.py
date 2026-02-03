@@ -53,9 +53,9 @@ def crop_content(img):
             x_max = max(x_max, x + w)
             y_max = max(y_max, y + h)
             
-        return img[int(y_min):int(y_max), int(x_min):int(x_max)]
+        return img[int(y_min):int(y_max), int(x_min):int(x_max)], int(y_min)
         
-    return img
+    return img, 0
 
 def fill_black_holes(img):
     """
@@ -96,21 +96,70 @@ def fill_black_holes(img):
     
     return result
 
-def stretch_to_360(img):
+def convert_to_equirectangular(img, horizon_y=None):
     """
-    Stretches the image to a 2:1 aspect ratio (Equirectangular).
+    Embeds the stitched image into a 2:1 Equirectangular canvas WITHOUT stretching.
+    Aligns the horizon_y of the input to the center of the canvas.
     """
-    height, width = img.shape[:2]
-    target_width = width
-    target_height = int(width / 2)
+    h_content, w_content = img.shape[:2]
     
-    if height > target_height:
-        target_height = height
-        target_width = height * 2
+    # Target dimensions for 360x180 Equirectangular
+    target_w = w_content
+    target_h = int(w_content / 2)
+    
+    if h_content >= target_h:
+        return cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
         
-    print(f"Stretching {width}x{height} to {target_width}x{target_height} for 360 format.")
-    resized = cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_LANCZOS4)
-    return resized
+    print(f"Embedding {w_content}x{h_content} strip into {target_w}x{target_h} canvas.")
+    
+    # Create black canvas
+    canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+    
+    # Calculate offset
+    if horizon_y is not None:
+        # Align provided horizon to center of canvas
+        center_y = target_h // 2
+        y_offset = center_y - horizon_y
+        
+        # Sanity check: Ensure we don't write out of bounds too much
+        # If y_offset leaves gaps, that's fine (filled black).
+        # If y_offset pushes image off screen, crop?
+        # Let's adjust if strictly necessary, but prefer the horizon alignment.
+        # If y_offset < 0 (image too low), clamp? NO, that breaks horizon.
+        # But we must ensure array indices are valid for the copy.
+        
+        # Actually, numpy slice assignment handles *some* clipping? No, it throws error if shapes mismatch.
+        # We need to compute valid intersection.
+    else:
+        # Center vertically
+        y_offset = (target_h - h_content) // 2
+
+    # Perform safe paste
+    y_start_src = 0
+    y_end_src = h_content
+    x_start_src = 0
+    x_end_src = w_content
+    
+    y_start_dst = y_offset
+    y_end_dst = y_offset + h_content
+    x_start_dst = 0
+    x_end_dst = w_content
+    
+    # Clip to canvas
+    if y_start_dst < 0:
+        y_start_src = -y_start_dst
+        y_start_dst = 0
+    
+    if y_end_dst > target_h:
+        diff = y_end_dst - target_h
+        y_end_src -= diff
+        y_end_dst = target_h
+        
+    # Apply
+    if y_end_src > y_start_src:
+        canvas[y_start_dst:y_end_dst, x_start_dst:x_end_dst] = img[y_start_src:y_end_src, x_start_src:x_end_src]
+    
+    return canvas
 
 def set_gpano_metadata(image_path, width, height):
     """

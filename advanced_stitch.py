@@ -146,11 +146,18 @@ def stitch_images_advanced(img_names):
         result = cv2.convertScaleAbs(result)
         
         print("Advanced Stitching Complete.")
-        # Return the actual image array
-        return True, result
+        
+        # Calculate horizon offset relative to the top of the image
+        # In spherical warping, y=0 is the horizon.
+        # The image starts at dest_sz[1] (y_min).
+        # So the horizon is at index 0 - dest_sz[1] = -dest_sz[1]
+        horizon_y = -dest_sz[1]
+        
+        # Return the actual image array and the horizon offset
+        return True, result, horizon_y
 
     except Exception as e:
         print(f"Advanced stitching error: {e}")
         import traceback
         traceback.print_exc()
-        return False, f"Advanced stitching failed: {str(e)}"
+        return False, f"Advanced stitching failed: {str(e)}", 0
