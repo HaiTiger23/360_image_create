@@ -15,7 +15,7 @@ def stitch_images_advanced(img_names):
         work_megapix = 0.6
         seam_megapix = 0.1
         compose_megapix = -1 # Keep original resolution
-        conf_thresh = 0.4 # LOWERED from 1.0 to capture more matches
+        conf_thresh = 0.15 # EXTREMELY PERMISSIVE to include top/bottom
         wave_correct = cv2.detail.WAVE_CORRECT_HORIZ
         warp_type = 'spherical' # FORCE SPHERICAL for 360 look
         blend_type = 'multiband'
@@ -62,7 +62,7 @@ def stitch_images_advanced(img_names):
 
         # 4. Matching
         print("Matching features...")
-        matcher = cv2.detail.BestOf2NearestMatcher_create(False, 0.3)
+        matcher = cv2.detail.BestOf2NearestMatcher_create(False, 0.15)
         matches = matcher.apply2(features)
         matcher.collectGarbage()
 
@@ -73,6 +73,8 @@ def stitch_images_advanced(img_names):
         
         if not b:
              return False, "Homography estimation failed."
+             
+        print(f"DEBUG: Stitched {len(cameras)} out of {len(full_img_list)} input images.")
 
         print("Adjusting bundle...")
         adjuster = cv2.detail_BundleAdjusterRay()
